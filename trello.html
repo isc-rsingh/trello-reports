@@ -1,0 +1,96 @@
+<html>
+<head>
+  <!-- ...  -->
+
+  <!-- The client library requires jQuery  -->
+  <script src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
+  <script src="https://api.trello.com/1/client.js?key=0f60c8b65c8e8b2099f253089d3e1f50"></script>
+  <style>
+  #chart rect {
+    fill: steelblue;
+  }
+  #chart text {
+    fill: white;
+    font: 10px sans-serif;
+    text-anchor: end;
+    /*background-color: steelblue;
+    text-align: right;
+    padding: 3px;
+    margin: 1px;
+    color: white;*/
+  }
+  </style>
+</head>
+<body>
+  <h1>Developer Advocacy Topic Coverage</h1>
+  <hr width="75%"/>
+  <svg id="chart"></svg>
+  <script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
+  <script>
+    Trello.authorize({name:'test',interactive:'false',success:'inTrello'});
+    var trlo = {};
+    trlo.labels = [];
+
+    Trello.get("/boards/551ee3e5f111b3e5a7a37240/cards", trelloSuccess, trelloError);
+    
+    function trelloSuccess(cards) {
+      for (var i = 0; i < cards.length; i++) {
+        lbls = cards[i].labels;
+        for (var j = 0; j < lbls.length; j++) {
+          processLabel(lbls[j], cards[i]);
+        }
+      }
+
+      // var data = [4, 8, 15, 16, 23, 42];
+      var width = 800, 
+          barHeight = 20;
+    
+      var x = d3.scale.linear()
+          .range([0, width]);
+          x.domain([0, d3.max(trlo.labels, function(d) { return d.count; })]);
+      var chart = d3.select('#chart')
+        .attr('width', width)
+        .attr('height', barHeight * trlo.labels.length);
+      
+      var bar = chart.selectAll('g')
+        .data(trlo.labels)
+        .enter().append('g')
+        .attr('transform', function(d,i) {return 'translate(0,'+i*barHeight+')'; });
+    
+      bar.append('rect')
+        .attr('width', function(d) {return x(d.count)})
+        .attr('height', barHeight-1);
+        
+      bar.append('text')
+        .attr('x', function(d) { return x(d.count)-3; })
+        .attr('y', barHeight/2)
+        .attr('dy', '.35em')
+        .text(function(d) { return d.name + ' (' + d.count + ')'; });
+    }
+
+    function processLabel(lbl, card) {
+      foundlabel = false;
+      foundlabelidx = -1;
+      for (var i = 0; i < trlo.labels.length; i++) {
+        if ( lbl.id == trlo.labels[i].id ) {
+          foundlabel = true;
+          foundlabelidx = i;
+          break;
+        }
+      }
+      if ( foundlabel ) {
+        trlo.labels[foundlabelidx].count += 1;
+        trlo.labels[foundlabelidx].cards.push( {'name': card.name, 'id':card.id} );
+      } else {
+        var newlabel = {'id':lbl.id,'name':lbl.name,'count':1,'cards':[]};
+        newlabel.cards.push( {'name': card.name, 'id':card.id} );
+        trlo.labels.push(newlabel);
+      }
+    }
+    
+    function trelloError(err) {
+        alert("error");
+    }
+  </script>
+</body>
+</html>
