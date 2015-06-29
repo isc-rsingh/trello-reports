@@ -1,15 +1,8 @@
 <html>
 <head>
-  <!-- ...  -->
-
-  <!-- The client library requires jQuery  -->
-  <script src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
-  <script src="https://api.trello.com/1/client.js?key=0f60c8b65c8e8b2099f253089d3e1f50"></script>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
   <style>
-  #chart rect {
-    fill: steelblue;
-  }
-  #chart text {
+  #chart text, #chart-shipped text {
     fill: white;
     font: 10px sans-serif;
     text-anchor: end;
@@ -19,21 +12,74 @@
     margin: 1px;
     color: white;*/
   }
+  #chart rect {
+    fill: steelblue;
+  }
+  #chart-shipped rect {
+    fill: indianred;
+  }
+  #chart, #chart-shipped {
+    border: 1px dotted black;
+  }
   </style>
 </head>
 <body>
-  <h1>Developer Advocacy Topic Coverage</h1>
-  <hr width="75%"/>
-  <svg id="chart"></svg>
+  <div class="container">
+    <h1>Developer Advocacy Topic Coverage</h1>
+    <h3>Count of <em>Active</em> Trello cards by label</h3>
+    <svg id="chart"></svg>
+  
+    <h3>Count of <em>Shipped</em> Trello cards by label</h3>
+    <svg id="chart-shipped"></svg>
+  </div>
+  
+  <!-- The Trello client library requires jQuery  -->
+  <script src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
+  <script src="https://api.trello.com/1/client.js?key=0f60c8b65c8e8b2099f253089d3e1f50"></script>
   <script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
   <script>
     Trello.authorize({name:'test',interactive:'false',success:'inTrello'});
     var trlo = {};
     trlo.labels = [];
-
-    Trello.get("/boards/551ee3e5f111b3e5a7a37240/cards", trelloSuccess, trelloError);
+    var maxCount = 10;
     
-    function trelloSuccess(cards) {
+    var listsInActivity = ['Approved','Producing','QA: Test/Review'];
+    var listsCompleted = ['Shipped'];
+    var lists = {};
+
+    // get the lists on the board and store 
+    Trello.get("/boards/551ee3e5f111b3e5a7a37240/lists", storeLists, trelloError);
+
+    function storeLists(listarray) {
+      for (var i = 0; i < listarray.length; i++) 
+        lists[listarray[i].id] = listarray[i].name;
+      
+      // get cards from DevAdv Kanban board
+      Trello.get("/boards/551ee3e5f111b3e5a7a37240/cards?filter=all", processCards, trelloError);
+    }
+
+    function processCards(cardarray) {
+      // now get cards that are in active progress and chart them
+      var activecards = [];
+      for (var i = 0; i < cardarray.length; i++) {
+        if ( cardarray[i].closed == false && listsInActivity.indexOf( lists[cardarray[i].idList] ) >= 0 ) 
+          activecards.push(cardarray[i]);
+      }
+      chartCards(activecards, 'chart');
+      
+      // now get cards whose work is complete and chart them
+      var completecards = [];
+      for (var i = 0; i < cardarray.length; i++) {
+        if ( listsCompleted.indexOf( lists[cardarray[i].idList] ) >= 0 ) 
+          completecards.push(cardarray[i]);
+      }
+      chartCards(completecards, 'chart-shipped');
+    }
+    
+    function chartCards(cards, svgid) {
+      trlo = {};
+      trlo.labels = [];
+
       for (var i = 0; i < cards.length; i++) {
         lbls = cards[i].labels;
         for (var j = 0; j < lbls.length; j++) {
@@ -41,14 +87,13 @@
         }
       }
 
-      // var data = [4, 8, 15, 16, 23, 42];
       var width = 800, 
           barHeight = 20;
     
       var x = d3.scale.linear()
           .range([0, width]);
-          x.domain([0, d3.max(trlo.labels, function(d) { return d.count; })]);
-      var chart = d3.select('#chart')
+          x.domain([0, maxCount]); //d3.max(trlo.labels, function(d) { return d.count; })]);
+      var chart = d3.select('#'+svgid)
         .attr('width', width)
         .attr('height', barHeight * trlo.labels.length);
       
